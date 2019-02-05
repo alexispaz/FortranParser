@@ -94,6 +94,7 @@ MODULE FortranParser
     REAL(rn),    POINTER :: Stack(:) => null()
     INTEGER              :: StackSize = 0
     INTEGER              :: StackPtr = 0
+    INTEGER              :: Error = 0
 
     character(len=MAX_FUN_LENGTH) :: funcString = ''
     character(len=MAX_FUN_LENGTH) :: funcStringOrig = ''
@@ -174,17 +175,25 @@ CONTAINS
   END SUBROUTINE parse
 
 !*****************************************************************************************
-  FUNCTION evaluate(this, Val) RESULT (res)
+  FUNCTION evaluate(this, Val, Error) RESULT (res)
     ! Evaluate bytecode of ith function for the values passed in array Val(:)
     class(EquationParser) :: this
     REAL(rn), DIMENSION(:), INTENT(in) :: Val                ! Variable values
-
+    INTEGER, optional,      intent(out):: Error              ! Error code
     REAL(rn)                           :: res                ! Result
     INTEGER                            :: IP,              & ! Instruction pointer
                                           DP,              & ! Data pointer
                                           SP                 ! Stack pointer
     REAL(rn),                PARAMETER :: zero = 0._rn
     integer       :: EvalErrType
+
+    IF (present(Error)) Error = 0
+
+    IF (this%Error /= 0) then
+      WRITE(*,*)'*** Error: Syntax or compilation error'    
+      IF (present(Error)) Error = this%Error
+      return
+    ENDIF
 
     DP = 1
     SP = 0
@@ -284,6 +293,7 @@ CONTAINS
     END DO
 
     IF (EvalErrType > 0) then
+      IF (present(Error)) Error = EvalErrType
       WRITE(*,*)'*** Error: ',EvalErrMsg(EvalErrType)
     else
       res = this%Stack(1)
@@ -302,27 +312,28 @@ CONTAINS
     INTEGER                                     :: ParCnt, & ! Parenthesis counter
                                                    j,ib,in,lFunc
 
+    IF (this%Error /= 0) return
     j = 1
     ParCnt = 0
     lFunc = LEN_TRIM(this%funcString)
     step: DO
-       IF (j > lFunc) CALL ParseErrMsg (j, this%funcStringOrig)
+       IF (j > lFunc) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error); return; ENDIF
        c = this%funcString(j:j)
        !-- -------- --------- --------- --------- --------- --------- --------- -------
        ! Check for valid operand (must appear)
        !-- -------- --------- --------- --------- --------- --------- --------- -------
        IF (c == '-' .OR. c == '+') THEN                      ! Check for leading - or +
           j = j+1
-          IF (j > lFunc) CALL ParseErrMsg (j, this%funcStringOrig, 'Missing operand')
+          IF (j > lFunc) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Missing operand'); return; ENDIF
           c = this%funcString(j:j)
-          IF (ANY(c == Ops)) CALL ParseErrMsg (j, this%funcStringOrig, 'Multiple operators')
+          IF (ANY(c == Ops)) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Multiple operators'); return; ENDIF
        END IF
        n = MathFunctionIndex (this%funcString(j:))
        IF (n > 0) THEN                                       ! Check for math function
           j = j+LEN_TRIM(Funcs(n))
-          IF (j > lFunc) CALL ParseErrMsg (j, this%funcStringOrig, 'Missing function argument')
+          IF (j > lFunc) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Missing function argument'); return; ENDIF
           c = this%funcString(j:j)
-          IF (c /= '(') CALL ParseErrMsg (j, this%funcStringOrig, 'Missing opening parenthesis')
+          IF (c /= '(') THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Missing opening parenthesis'); return; ENDIF
        END IF
        IF (c == '(') THEN                                    ! Check for opening parenthesis
           ParCnt = ParCnt+1
@@ -331,21 +342,21 @@ CONTAINS
        END IF
        IF (SCAN(c,'0123456789.') > 0) THEN                   ! Check for number
           r = RealNum (this%funcString(j:),ib,in,err)
-          IF (err) CALL ParseErrMsg (j, this%funcStringOrig, 'Invalid number format:  '//this%funcString(j+ib-1:j+in-2))
+          IF (err) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Invalid number format:  '//this%funcString(j+ib-1:j+in-2)); return; ENDIF
           j = j+in-1
           IF (j > lFunc) EXIT
           c = this%funcString(j:j)
        ELSE                                                  ! Check for variable
           n = VariableIndex (this%funcString(j:),this%variableNames,ib,in)
-          IF (n == 0) CALL ParseErrMsg (j, this%funcStringOrig, 'Invalid element: '//this%funcString(j+ib-1:j+in-2))
+          IF (n == 0) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Invalid element: '//this%funcString(j+ib-1:j+in-2)); return; ENDIF
           j = j+in-1
           IF (j > lFunc) EXIT
           c = this%funcString(j:j)
        END IF
        DO WHILE (c == ')')                                   ! Check for closing parenthesis
           ParCnt = ParCnt-1
-          IF (ParCnt < 0) CALL ParseErrMsg (j, this%funcStringOrig, 'Mismatched parenthesis')
-          IF (this%funcString(j-1:j-1) == '(') CALL ParseErrMsg (j-1, this%funcStringOrig, 'Empty parentheses')
+          IF (ParCnt < 0) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Mismatched parenthesis'); return; ENDIF
+          IF (this%funcString(j-1:j-1) == '(') THEN; CALL ParseErrMsg (j-1, this%funcStringOrig, this%Error, 'Empty parentheses'); return; ENDIF
           j = j+1
           IF (j > lFunc) EXIT
           c = this%funcString(j:j)
@@ -355,10 +366,10 @@ CONTAINS
        !-- -------- --------- --------- --------- --------- --------- --------- -------
        IF (j > lFunc) EXIT
        IF (ANY(c == Ops)) THEN                               ! Check for multiple operators
-          IF (j+1 > lFunc) CALL ParseErrMsg (j, this%funcStringOrig)
-          IF (ANY(this%funcString(j+1:j+1) == Ops)) CALL ParseErrMsg (j+1, this%funcStringOrig, 'Multiple operators')
+          IF (j+1 > lFunc) THEN; CALL ParseErrMsg (j, this%funcStringOrig, this%Error); return; ENDIF
+          IF (ANY(this%funcString(j+1:j+1) == Ops)) THEN; CALL ParseErrMsg (j+1, this%funcStringOrig, this%Error, 'Multiple operators'); return; ENDIF
        ELSE                                                  ! Check for next operand
-          CALL ParseErrMsg (j, this%funcStringOrig, 'Missing operator')
+          CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Missing operator'); return
        END IF
        !-- -------- --------- --------- --------- --------- --------- --------- -------
        ! Now, we have an operand and an operator: the next loop will check for another 
@@ -366,7 +377,7 @@ CONTAINS
        !-- -------- --------- --------- --------- --------- --------- --------- -------
        j = j+1
     END DO step
-    IF (ParCnt > 0) CALL ParseErrMsg (j, this%funcStringOrig, 'Missing )')
+    IF (ParCnt > 0) CALL ParseErrMsg (j, this%funcStringOrig, this%Error, 'Missing )')
   END SUBROUTINE CheckSyntax
 
 !*****************************************************************************************
@@ -388,14 +399,14 @@ CONTAINS
   END FUNCTION EvalErrMsg
 
 !*****************************************************************************************
-  SUBROUTINE ParseErrMsg (j, FuncStr, Msg)
+  SUBROUTINE ParseErrMsg (j, FuncStr, Error, Msg)
     ! Print error message and terminate program
     INTEGER,                     INTENT(in) :: j
     CHARACTER (LEN=*),           INTENT(in) :: FuncStr       ! Original function string
+    INTEGER,                     INTENT(out):: Error
     CHARACTER (LEN=*), OPTIONAL, INTENT(in) :: Msg
 
-    INTEGER                                 :: k
-
+    Error = -1
     IF (PRESENT(Msg)) THEN
        WRITE(*,*) '*** Error in syntax of function string: '//Msg
     ELSE
@@ -406,7 +417,6 @@ CONTAINS
     WRITE(*,'(A)') ' '//FuncStr
 
     WRITE(*,'(A)') '?'
-    STOP
   END SUBROUTINE ParseErrMsg
 
 !*****************************************************************************************
@@ -525,6 +535,8 @@ CONTAINS
     class(EquationParser) :: this
     INTEGER                                     :: istat
 
+    IF (this%Error /= 0) return
+
     IF (ASSOCIATED(this%ByteCode)) DEALLOCATE ( this%ByteCode, &
                                                    this%Immed,    &
                                                    this%Stack     )
@@ -541,7 +553,7 @@ CONTAINS
                STAT = istat                            )
     IF (istat /= 0) THEN
        WRITE(*,*) '*** Parser error: Memmory allocation for byte code failed'
-       STOP
+       this%Error = -1
     ELSE
        this%ByteCodeSize = 0
        this%ImmedSize    = 0
