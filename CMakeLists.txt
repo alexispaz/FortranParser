@@ -2,7 +2,7 @@
 # HEADER
 #################################################################
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.7)
-PROJECT(fortranparser Fortran)
+PROJECT(FortranParser Fortran)
 SET(LIB ${PROJECT_NAME})
 
 #################################################################
@@ -30,6 +30,7 @@ SET(${PROJECT_NAME}_SOVERSION 1)
 # DEFINE PATHS
 #################################################################
 
+SET(CMAKE_PATH ${CMAKE_SOURCE_DIR}/CMake)
 SET(SRC_PATH ${CMAKE_SOURCE_DIR}/src)
 SET(LIB_PATH ${SRC_PATH}/lib)
 SET(EXAMPLES_PATH ${SRC_PATH}/examples)
@@ -67,6 +68,14 @@ IF(NOT CMAKE_BUILD_TYPE)
 
   SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS NONE DEBUG RELEASE)
 ENDIF(NOT CMAKE_BUILD_TYPE)
+
+IF(NOT ${PROJECT_NAME}_ENABLE_TESTS)
+    OPTION(${PROJECT_NAME}_ENABLE_TESTS "Enable/disable tests compilation" OFF)
+ENDIF(NOT ${PROJECT_NAME}_ENABLE_TESTS)
+
+# IF(NOT ${PROJECT_NAME}_ENABLE_EXAMPLES)
+#     OPTION(${PROJECT_NAME}_ENABLE_EXAMPLES "Enable/disable examples compilation" OFF)
+# ENDIF(NOT ${PROJECT_NAME}_ENABLE_EXAMPLES)
 
 #################################################################
 # List of external libraries
@@ -190,6 +199,16 @@ ENDIF()
 #################################################################
 
 ADD_SUBDIRECTORY(${LIB_PATH})
-ADD_SUBDIRECTORY(${TESTS_PATH})
+IF(${PROJECT_NAME}_ENABLE_TESTS)
+  ADD_SUBDIRECTORY(${TESTS_PATH})
+ENDIF()
 #ADD_SUBDIRECTORY(${EXAMPLES_PATH})
+
+#################################################################
+# CREATE CONFIG FILE
+#################################################################
+
+CONFIGURE_FILE(${CMAKE_PATH}/${PROJECT_NAME}Config.cmake.in 
+               ${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+               @ONLY)
 
