@@ -1,3 +1,10 @@
+Note: This is a fork from https://github.com/jacopo-chevallard/FortranParser
+
+Some minor modifications has been performed:
+-  Adapt CMake compilation system
+-  Replace STOP statements by error code handling.
+-  Replace the REAL32 by REAL64 
+
 # FortranParser
 
 Fortran 2008 parser of mathematical expressions, based on Roland Schmehl [fparser](http://fparser.sourceforge.net)

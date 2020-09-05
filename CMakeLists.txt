@@ -1,151 +1,215 @@
-# CMake project file for mt_stream
-cmake_minimum_required ( VERSION 2.6 )
+#################################################################
+# HEADER
+#################################################################
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.7)
+PROJECT(FortranParser Fortran)
+SET(LIB ${PROJECT_NAME})
 
-# Allows to set project version
-cmake_policy(SET CMP0048 NEW)
-project (FortranParser VERSION 2.0.3)
+#################################################################
+# OBTAIN GIT TAG TO ASSIGN AS PROJECT VERSION
+#################################################################
 
-# Which languages do we use
-enable_language ( Fortran )
+FIND_PACKAGE( Git )
+SET(GIT_TAG 0.0.1)
+if(GIT_EXECUTABLE)
+    execute_process(
+    COMMAND git describe
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_TAG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+endif()
 
-# Set the CMAKE_MODULE_PATH
-LIST (APPEND CMAKE_MODULE_PATH $ENV{CMAKE_MACROS})
-LIST ( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" )
+message(STATUS "PROJECT VERSION: ${GIT_TAG}")
+SET(${PROJECT_NAME}_VERSION ${GIT_TAG})
+SET(${PROJECT_NAME}_SOVERSION 1)
 
-set(ENABLE_TESTING ON CACHE INTERNAL "flag to enable unit tests")
+#SET(CMAKE_VERBOSE_MAKEFILE TRUE)
 
-# Check that when using GNU Fortran the free form flag is passed
-if ( NOT Fortran_FLAGS_ARE_SET )
-  if ( CMAKE_Fortran_COMPILER_ID STREQUAL GNU )
-    include( GNU_Fortran_Flags )
-  elseif ( CMAKE_Fortran_COMPILER_ID STREQUAL Intel )
-    include( Intel_Fortran_Flags )
-  endif ( CMAKE_Fortran_COMPILER_ID STREQUAL GNU )
-endif ( NOT Fortran_FLAGS_ARE_SET )
+#################################################################
+# DEFINE PATHS
+#################################################################
 
-if ( NOT RPATH_CONFIG )
-  include ( General_rpath_config ) 
-endif ( NOT RPATH_CONFIG )
+SET(CMAKE_PATH ${CMAKE_SOURCE_DIR}/CMake)
+SET(SRC_PATH ${CMAKE_SOURCE_DIR}/src)
+SET(LIB_PATH ${SRC_PATH}/lib)
+SET(EXAMPLES_PATH ${SRC_PATH}/examples)
+SET(TESTS_PATH ${SRC_PATH}/tests)
+SET(INCLUDES_PATH ${SRC_PATH}/include)
 
-
-# Set library name
-set ( LIBRARY_NAME fortranparser )
-
-# Whether you build a static or shared library
-set(LIBRARY_TYPE SHARED)
-if (CMAKE_LIBRARY_TYPE)
-  set(LIBRARY_TYPE ${CMAKE_LIBRARY_TYPE})
-endif (CMAKE_LIBRARY_TYPE)
-
-# Library installation directory
-set (CMAKE_LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
-
-# Header files installation directory
-set (CMAKE_INCLUDEDIR ${CMAKE_INSTALL_PREFIX}/include/${LIBRARY_NAME})
-
-# Binary files installation directory
-set (CMAKE_BINDIR ${CMAKE_INSTALL_PREFIX}/bin)
-
-# Set installation directory for *mod files
-set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/mod_files)
-
-# Source files used to build the library
-FILE(GLOB SRC_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/*.f90 ${CMAKE_CURRENT_SOURCE_DIR}/src/*.F90)
-
-# Command to build the library
-add_library(
-  ${LIBRARY_NAME}
-  ${LIBRARY_TYPE} 
-  ${SRC_FILES}
-)
-
-# install library
-install(
-  TARGETS ${LIBRARY_NAME} 
-  ARCHIVE DESTINATION ${CMAKE_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_LIBDIR}
-)
-
-# install header (*mod) files
-install(
-  DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/ 
-  DESTINATION ${CMAKE_INCLUDEDIR}
-)
-
-# configure a number version file to pass some of the CMake settings
-# to the source code
-configure_file(
-  $ENV{CMAKE_MACROS}/pkg-config.pc.cmake
-  ${CMAKE_CURRENT_SOURCE_DIR}/${LIBRARY_NAME}.pc
-  @ONLY
-)
-
-# install configuration file
-install(
-  FILES ${CMAKE_CURRENT_SOURCE_DIR}/${LIBRARY_NAME}.pc
-  DESTINATION ${CMAKE_LIBDIR}/pkgconfig
-  )
-
-set_target_properties(
-  ${LIBRARY_NAME}
-  PROPERTIES COMPILE_FLAGS "${Fortran_FLAGS} ${CMAKE_Fortran_COMPILER_FLAGS}"
-  )
-
-# set variables which will be sued by a calling CMakeLists.txt file
-set ( FORTRANPARSER_INCLUDE_DIR "${CMAKE_INCLUDEDIR}" CACHE INTERNAL "FORTRANPARSER include directory" )
-set ( FORTRANPARSER_LIBRARIES_DIR "${CMAKE_LIBDIR}" CACHE INTERNAL "FORTRANPARSER library directory" )
-set ( FORTRANPARSER_LIBRARIES "${LIBRARY_NAME}" CACHE INTERNAL "FORTRANPARSER library" )
-
-# *******************************************
-# ************* UNINSTALL THE LIBRARY *******
-# *******************************************
-configure_file(
-    "$ENV{CMAKE_MACROS}/cmake_uninstall.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake"
-    IMMEDIATE @ONLY)
-
-add_custom_target(uninstall
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake)
-
-# **************************************************
-# ************* EXTRACT THE PACKAGE VERSION FROM THE GIT TAG
-# **************************************************
-configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${LIBRARY_NAME}_meta_info.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake/${LIBRARY_NAME}_meta_info.cmake"
-)
-
-add_custom_command(TARGET ${LIBRARY_NAME} PRE_BUILD COMMAND cmake -P ${CMAKE_CURRENT_BINARY_DIR}/cmake/${LIBRARY_NAME}_meta_info.cmake)
-
-# Testing routine
-if (ENABLE_TESTING)
-  enable_testing( )
-
-  add_executable( test0 "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/testfp.f90" )
-  target_link_libraries( test0 ${LIBRARY_NAME} )
-  add_test( test0 test0 )
-
-  add_executable( test1 "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/testfp1.f90" )
-  target_link_libraries( test1 ${LIBRARY_NAME} )
-  add_test( test1 test1 )
-
-  add_executable( test2 "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/testfp2.f90" )
-  target_link_libraries( test2 ${LIBRARY_NAME} )
-  add_test( test2 test2 )
-
-  add_executable( test3 "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/testfp3.f90" )
-  target_link_libraries( test3 ${LIBRARY_NAME} )
-  add_test( test3 test3 )
-
-  add_executable( test4 "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/testfp4.f90" )
-  target_link_libraries( test4 ${LIBRARY_NAME} )
-  add_test( test4 test4 )
-
-  add_executable( test5 "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/testfp5.f90" )
-  target_link_libraries( test5 ${LIBRARY_NAME} )
-  add_test( test5 test5 )
-endif(ENABLE_TESTING)
+#SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake/Modules/")
 
 
+#################################################################
+# ADD INCLUDE DIRS
+#################################################################
+
+#include_directories(${INCLUDES_PATH})
+
+#################################################################
+# BUILD PATHS
+#################################################################
+
+SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
+SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
+SET(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/modules)
+SET(MODULE_OUTPUT_PATH ${CMAKE_Fortran_MODULE_DIRECTORY})
+SET(THIRDPARTY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/thirdparty)
+INCLUDE_DIRECTORIES(${CMAKE_Fortran_MODULE_DIRECTORY})
+
+#################################################################
+# CONFIGURATION TYPES & BUILD MODE
+#################################################################
+
+SET(CMAKE_CONFIGURATION_TYPES DEBUG RELEASE)
+IF(NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE DEBUG CACHE STRING
+      "Choose the type of build, options are: NONE DEBUG RELEASE"
+      FORCE)
+
+  SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS NONE DEBUG RELEASE)
+ENDIF(NOT CMAKE_BUILD_TYPE)
+
+IF(NOT ${PROJECT_NAME}_ENABLE_TESTS)
+    OPTION(${PROJECT_NAME}_ENABLE_TESTS "Enable/disable tests compilation" OFF)
+ENDIF(NOT ${PROJECT_NAME}_ENABLE_TESTS)
+
+# IF(NOT ${PROJECT_NAME}_ENABLE_EXAMPLES)
+#     OPTION(${PROJECT_NAME}_ENABLE_EXAMPLES "Enable/disable examples compilation" OFF)
+# ENDIF(NOT ${PROJECT_NAME}_ENABLE_EXAMPLES)
+
+#################################################################
+# List of external libraries
+#################################################################
+
+SET(EXT_LIBS  )
+
+#################################################################
+# Find packages
+#################################################################
+
+FOREACH(EXT_LIB ${EXT_LIBS})
+    IF(DEFINED ${PROJECT_NAME}_ENABLE_${EXT_LIB} AND ${PROJECT_NAME}_ENABLE_${EXT_LIB} AND NOT ${EXT_LIB}_FOUND)
+        FIND_PACKAGE( ${EXT_LIB} )
+    
+        IF (${EXT_LIB}_FOUND)
+            ADD_DEFINITIONS(-DENABLE_${EXT_LIB})
+            IF(IS_DIRECTORY ${${EXT_LIB}_INCLUDE_DIR})
+               INCLUDE_DIRECTORIES(${${EXT_LIB}_INCLUDE_DIR})
+            ENDIF()
+            LINK_DIRECTORIES(${${EXT_LIB}_LIBRARIES})
+        ENDIF()
+
+    ELSEIF(DEFINED ${PROJECT_NAME}_ENABLE_${EXT_LIB} AND NOT ${PROJECT_NAME}_ENABLE_${EXT_LIB})
+        UNSET(${EXT_LIB}_INCLUDES CACHE)
+        UNSET(${EXT_LIB}_LIBS CACHE)
+        UNSET(${EXT_LIB}_INCLUDE_DIR CACHE)
+        UNSET(${EXT_LIB}_LIBRARIES CACHE)
+
+    ELSE(NOT DEFINED ${PROJECT_NAME}_ENABLE_${EXT_LIB})
+        FIND_PACKAGE( ${EXT_LIB} )
+
+        IF (${${EXT_LIB}_FOUND})
+           SET(NO_LIBS FALSE)
+           OPTION(${PROJECT_NAME}_ENABLE_${EXT_LIB} "Enable/disable ${EXT_LIB} library" ON)
+           ADD_DEFINITIONS(-DENABLE_${EXT_LIB})
+           IF(IS_DIRECTORY ${${EXT_LIB}_INCLUDE_DIR})
+               INCLUDE_DIRECTORIES(${${EXT_LIB}_INCLUDE_DIR})
+           ENDIF()
+            LINK_DIRECTORIES(${${EXT_LIB}_LIBRARIES})
+        ELSE()
+           OPTION(${PROJECT_NAME}_ENABLE_${EXT_LIB} "Enable/disable ${EXT_LIB} library" OFF)
+           UNSET(${EXT_LIB}_INCLUDES CACHE)
+           UNSET(${EXT_LIB}_LIBS CACHE)
+           UNSET(${EXT_LIB}_INCLUDE_DIR CACHE)
+           UNSET(${EXT_LIB}_LIBRARIES CACHE)
+        ENDIF()
+    ENDIF()
+ENDFOREACH ()
+
+
+#################################################################
+# FFLAGS depend on the compiler and the build type
+#################################################################
+
+GET_FILENAME_COMPONENT(Fortran_COMPILER_NAME ${CMAKE_Fortran_COMPILER} NAME)
+
+IF(CMAKE_BUILD_TYPE STREQUAL "DEBUG")
+#   SET(MACROS "${MACROS} -DDEBUG -Dmemcheck")
+    ADD_DEFINITIONS(-DDEBUG)
+    ADD_DEFINITIONS(-Dmemcheck)
+ENDIF()
+
+ADD_DEFINITIONS(-D${CMAKE_Fortran_COMPILER_ID})
+
+message(STATUS "COMPILER INFO: ${CMAKE_Fortran_COMPILER_ID} - ${Fortran_COMPILER_NAME}")
+
+IF (${CMAKE_Fortran_COMPILER_ID} STREQUAL "GNU" OR Fortran_COMPILER_NAME MATCHES "gfortran*")
+  # gfortran 
+  set(FORTRAN_FLAGS "-fdefault-real-8 -ffree-line-length-0 -cpp -Wimplicit-interface ${EXTRA_FLAGS} ")
+  set (CMAKE_Fortran_FLAGS "${FORTRAN_FLAGS} ${MACROS} ${INCLUDES} " CACHE STRING "" FORCE)
+  set (CMAKE_Fortran_FLAGS_RELEASE "-O3 ${EXTRA_FLAGS} " CACHE STRING "" FORCE)
+  set (CMAKE_Fortran_FLAGS_DEBUG   "-g -fbacktrace -fbounds-check -fprofile-arcs -ftest-coverage -Wimplicit-interface ${EXTRA_FLAGS} " CACHE STRING "" FORCE)
+ELSEIF (${CMAKE_Fortran_COMPILER_ID} STREQUAL "Intel" OR Fortran_COMPILER_NAME MATCHES "ifort*")
+  # ifort (untested)
+  set(FORTRAN_FLAGS "-r8 -fpp -W1 ${EXTRA_FLAGS} ")
+  set (CMAKE_Fortran_FLAGS "${FORTRAN_FLAGS} ${MACROS} ${INCLUDES}" CACHE STRING "" FORCE)
+  set (CMAKE_Fortran_FLAGS_RELEASE "-O3 ${EXTRA_FLAGS} " CACHE STRING "" FORCE)
+  set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -traceback -g -debug all -check all -ftrapuv -warn nointerfaces ${EXTRA_FLAGS} " CACHE STRING "" FORCE)
+# A partir de CMake 3.1
+# -prof-gen:srcpos -prof-dir${PROJECT_BINARY_DIR}
+
+ELSEIF (${CMAKE_Fortran_COMPILER_ID} STREQUAL "XL" OR Fortran_COMPILER_NAME MATCHES "xlf*")
+  # xlf (untested)
+  set(FORTRAN_FLAGS "-q64 -qrealsize=8 -qsuffix=f=f90:cpp=f90 ${EXTRA_FLAGS} ")
+  set (CMAKE_Fortran_FLAGS "${FORTRAN_FLAGS} ${MACROS} ${INCLUDES}" CACHE STRING "" FORCE)
+  set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -qstrict ${EXTRA_FLAGS} " CACHE STRING "" FORCE)
+  set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -qfullpath -qkeepparm ${EXTRA_FLAGS} " CACHE STRING "" FORCE)
+ELSE ()
+  message ("No optimized Fortran compiler flags are known, we just try -O2...")
+  set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
+  set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g")
+ENDIF ()
+
+SET(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--allow-multiple-definition")
+
+message (STATUS "CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
+message (STATUS "CMAKE_Fortran_FLAGS: " ${CMAKE_Fortran_FLAGS})
+message (STATUS "CMAKE_Fortran_FLAGS_RELEASE: " ${CMAKE_Fortran_FLAGS_RELEASE})
+message (STATUS "CMAKE_Fortran_FLAGS_DEBUG: " ${CMAKE_Fortran_FLAGS_DEBUG})
+
+#################################################################
+# ENABLE TESTING
+#################################################################
+
+SET(BUILDNAME ${CMAKE_Fortran_COMPILER_ID}_${CMAKE_BUILD_TYPE}_MKL=${${PROJECT_NAME}_ENABLE_MKL} CACHE STRING "" )
+ENABLE_TESTING()
+INCLUDE(CTest)
+
+#################################################################
+# STATIC LIBRARIES
+#################################################################
+# Try to search first static libraries
+IF(NOT ${BUILD_SHARED_LIBS})
+    SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a ${CMAKE_FIND_LIBRARY_SUFFIXES}")
+ENDIF()
+
+#################################################################
+# ADD SOURCE SUBDIRS
+#################################################################
+
+ADD_SUBDIRECTORY(${LIB_PATH})
+IF(${PROJECT_NAME}_ENABLE_TESTS)
+  ADD_SUBDIRECTORY(${TESTS_PATH})
+ENDIF()
+#ADD_SUBDIRECTORY(${EXAMPLES_PATH})
+
+#################################################################
+# CREATE CONFIG FILE
+#################################################################
+
+CONFIGURE_FILE(${CMAKE_PATH}/${PROJECT_NAME}Config.cmake.in 
+               ${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+               @ONLY)
 
