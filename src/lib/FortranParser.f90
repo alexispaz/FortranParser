@@ -83,22 +83,20 @@ MODULE FortranParser
                                                                        'acos ', &
                                                                        'atan ' /)
 
-  INTEGER, parameter  :: MAX_FUN_LENGTH = 1024
-
   TYPE EquationParser
+    private
 
-    INTEGER(is), POINTER :: ByteCode(:) => null()
-    INTEGER              :: ByteCodeSize = 0
-    REAL(rn),    POINTER :: Immed(:) => null()
-    INTEGER              :: ImmedSize = 0
-    REAL(rn),    POINTER :: Stack(:) => null()
-    INTEGER              :: StackSize = 0
-    INTEGER              :: StackPtr = 0
-    INTEGER              :: Error = 0
+    INTEGER(is), ALLOCATABLE :: ByteCode(:)
+    INTEGER                  :: ByteCodeSize = 0
+    REAL(rn), ALLOCATABLE    :: Immed(:)
+    INTEGER                  :: ImmedSize = 0
+    REAL(rn), ALLOCATABLE    :: Stack(:)
+    INTEGER                  :: StackSize = 0
+    INTEGER                  :: StackPtr = 0
 
-    character(len=MAX_FUN_LENGTH) :: funcString = ''
-    character(len=MAX_FUN_LENGTH) :: funcStringOrig = ''
-    character(len=MAX_FUN_LENGTH), allocatable :: variableNames(:) 
+    character(:), allocatable :: funcString
+    character(:), allocatable :: funcStringOrig
+    character(:), allocatable :: variableNames(:) 
     contains
 
       private
@@ -110,8 +108,6 @@ MODULE FortranParser
       procedure :: CompileSubstr
       procedure :: MathItemIndex
       procedure :: CheckSyntax
-
-      final :: finalize
 
   END TYPE EquationParser
 
@@ -128,41 +124,18 @@ CONTAINS
     CHARACTER (LEN=*),               INTENT(in) :: FuncStr   ! Function string
     CHARACTER (LEN=*), DIMENSION(:), INTENT(in) :: Var       ! Array with variable names
 
-    constructor%ByteCode => null()
-    constructor%Immed => null()
-    constructor%Stack => null()
-
-    constructor%ByteCodeSize = 0
-    constructor%ImmedSize = 0
-    constructor%StackSize = 0
-    constructor%StackPtr = 0
-
-    constructor%funcString = FuncStr
-    constructor%funcStringOrig = FuncStr
-
-    allocate(constructor%variableNames(size(Var)))
-
-    constructor%variableNames(:) = Var(:)
+    allocate(constructor%funcString,source=FuncStr)
+    allocate(constructor%funcStringOrig,source=FuncStr)
+    allocate(constructor%variableNames,source=Var)
 
     call constructor%parse()
 
   end function constructor
 
 !*****************************************************************************************
-  subroutine finalize(this)
-
-    type(EquationParser) :: this
-
-    if (associated(this%ByteCode))  nullify(this%ByteCode)
-    if (associated(this%Immed))     nullify(this%Immed)
-    if (associated(this%Stack))     nullify(this%Stack)
-
-  end subroutine finalize
-
-!*****************************************************************************************
   SUBROUTINE parse(this)
     ! Parse ith function string FuncStr and compile it into bytecode
-    class(EquationParser) :: this
+    class(EquationParser), intent(inout) :: this
 
     CALL Replace('**','^ ', this%funcString)                            ! Exponent into 1-Char. format
 
@@ -177,7 +150,7 @@ CONTAINS
 !*****************************************************************************************
   FUNCTION evaluate(this, Val, Error) RESULT (res)
     ! Evaluate bytecode of ith function for the values passed in array Val(:)
-    class(EquationParser) :: this
+    class(EquationParser), intent(inout) :: this
     REAL(rn), DIMENSION(:), INTENT(in) :: Val                ! Variable values
     INTEGER, optional,      intent(out):: Error              ! Error code
     REAL(rn)                           :: res                ! Result
@@ -304,7 +277,7 @@ CONTAINS
 !*****************************************************************************************
   SUBROUTINE CheckSyntax(this)
     ! Check syntax of function string,  returns 0 if syntax is ok
-    class(EquationParser) :: this
+    class(EquationParser), intent(in) :: this
     INTEGER(is)                                 :: n
     CHARACTER (LEN=1)                           :: c
     REAL(rn)                                    :: r
@@ -406,7 +379,6 @@ CONTAINS
     INTEGER,                     INTENT(out):: Error
     CHARACTER (LEN=*), OPTIONAL, INTENT(in) :: Msg
 
-    Error = -1
     IF (PRESENT(Msg)) THEN
        WRITE(*,*) '*** Error in syntax of function string: '//Msg
     ELSE
@@ -466,9 +438,9 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER (LEN=*),               INTENT(in) :: str       ! String
     CHARACTER (LEN=*), DIMENSION(:), INTENT(in) :: Var       ! Array with variable names
-    INTEGER(is)                                 :: n         ! Index of variable
     INTEGER, OPTIONAL,              INTENT(out) :: ibegin, & ! Start position of variable name
                                                    inext     ! Position of character after name
+    INTEGER(is)                                 :: n         ! Index of variable
     INTEGER                                     :: j,ib,in,lstr
     !----- -------- --------- --------- --------- --------- --------- --------- -------
     n = 0
@@ -482,7 +454,7 @@ CONTAINS
        END DO
        DO j=1,SIZE(Var)
           IF (str(ib:in-1) == Var(j)) THEN                     
-             n = j                                           ! Variable name found
+             n = int(j,is)                                   ! Variable name found
              EXIT
           END IF
        END DO
@@ -516,11 +488,13 @@ CONTAINS
   SUBROUTINE Replace (ca,cb,str)
     ! Replace ALL appearances of character set ca in string str by character set cb
     CHARACTER (LEN=*),       INTENT(in) :: ca
-    CHARACTER (LEN=LEN(ca)), INTENT(in) :: cb                ! LEN(ca) must be LEN(cb)
+    CHARACTER (LEN=*),       INTENT(in) :: cb                ! LEN(ca) must be LEN(cb)
     CHARACTER (LEN=*),    INTENT(inout) :: str
 
     INTEGER                             :: j,lca
-
+    
+    if (len(ca) /= len(cb)) stop 'Replace: len(ca) should equal len(cb)'
+    
     lca = LEN(ca)
 
     DO j=1,LEN_TRIM(str)-lca+1
@@ -532,14 +506,12 @@ CONTAINS
 !*****************************************************************************************
   SUBROUTINE Compile(this)
     ! Compile i-th function string F into bytecode
-    class(EquationParser) :: this
+    class(EquationParser), intent(inout) :: this
     INTEGER                                     :: istat
 
-    IF (this%Error /= 0) return
-
-    IF (ASSOCIATED(this%ByteCode)) DEALLOCATE ( this%ByteCode, &
-                                                   this%Immed,    &
-                                                   this%Stack     )
+    IF (ALLOCATED(this%ByteCode)) DEALLOCATE ( this%ByteCode, &
+                                               this%Immed,    &
+                                               this%Stack     )
     this%ByteCodeSize = 0
     this%ImmedSize    = 0
     this%StackSize    = 0
@@ -567,12 +539,12 @@ CONTAINS
 !*****************************************************************************************
   SUBROUTINE AddCompiledByte(this, b)
     ! Add compiled byte to bytecode
-    class(EquationParser) :: this
+    class(EquationParser), intent(inout) :: this
     INTEGER(is), INTENT(in) :: b                             ! Value of byte to be added
 
     this%ByteCodeSize = this%ByteCodeSize + 1
 
-    IF (ASSOCIATED(this%ByteCode)) then
+    IF (ALLOCATED(this%ByteCode)) then
       this%ByteCode(this%ByteCodeSize) = b
     endif
 
@@ -581,7 +553,7 @@ CONTAINS
 !*****************************************************************************************
   FUNCTION MathItemIndex(this, b, e) RESULT (n)
     ! Return math item index, if item is real number, enter it into Comp-structure
-    class(EquationParser) :: this
+    class(EquationParser), intent(inout) :: this
 
     INTEGER,           INTENT(in) :: b,e                     ! First and last pos. of substring
     INTEGER(is)                                 :: n         ! Byte value of math item
@@ -590,11 +562,11 @@ CONTAINS
 
     IF (SCAN(this%funcString(b:b),'0123456789.') > 0) THEN                 ! Check for begin of a number
        this%ImmedSize = this%ImmedSize + 1
-       IF (ASSOCIATED(this%Immed)) this%Immed(this%ImmedSize) = RealNum(this%funcString(b:e))
+       IF (ALLOCATED(this%Immed)) this%Immed(this%ImmedSize) = RealNum(this%funcString(b:e))
        n = cImmed
     ELSE                                                     ! Check for a variable
        n = VariableIndex(this%funcString(b:e), this%variableNames)
-       IF (n > 0) n = VarBegin+n-1
+       IF (n > 0) n = VarBegin+n-1_is
     END IF
 
   END FUNCTION MathItemIndex
@@ -628,7 +600,7 @@ CONTAINS
 !*****************************************************************************************
   RECURSIVE SUBROUTINE CompileSubstr(this, b, e)
     ! Compile i-th function string funcString into bytecode
-    class(EquationParser) :: this
+    class(EquationParser), intent(inout) :: this
     INTEGER,                         INTENT(in) :: b,e       ! Begin and end position substring
 
     INTEGER(is)                                 :: n
