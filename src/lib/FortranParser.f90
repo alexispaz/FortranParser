@@ -93,6 +93,8 @@ MODULE FortranParser
     REAL(rn), ALLOCATABLE    :: Stack(:)
     INTEGER                  :: StackSize = 0
     INTEGER                  :: StackPtr = 0
+    INTEGER                  :: Error = 0
+
 
     character(:), allocatable :: funcString
     character(:), allocatable :: funcStringOrig
@@ -277,7 +279,7 @@ CONTAINS
 !*****************************************************************************************
   SUBROUTINE CheckSyntax(this)
     ! Check syntax of function string,  returns 0 if syntax is ok
-    class(EquationParser), intent(in) :: this
+    class(EquationParser), intent(inout) :: this
     INTEGER(is)                                 :: n
     CHARACTER (LEN=1)                           :: c
     REAL(rn)                                    :: r

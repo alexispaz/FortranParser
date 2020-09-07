@@ -1,9 +1,17 @@
-Note: This is a fork from https://github.com/jacopo-chevallard/FortranParser
+This is a fork from [jacopo-chevallard/FortranParser](https://github.com/jacopo-chevallard/FortranParser), 
+which bring together the changes of the [hennink/FortranParser](https://github.com/hennink/FortranParser) and [victorsndvg/FortranParser](https://github.com/victorsndvg/FortranParser) forks.
 
-Some minor modifications has been performed:
--  Adapt CMake compilation system
--  Replace STOP statements by error code handling.
--  Replace the REAL32 by REAL64 
+victorsndvg changes include:
+- Adapt CMake compilation system
+- Replace STOP statements by error code handling.
+- Replace the REAL32 by REAL64 
+
+hennink changes include:
+- Allow characters of arbitrary length
+- Fix memory leaks
+- etc. 
+
+See commits history for detailed contribution.
 
 # FortranParser
 
