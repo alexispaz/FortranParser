@@ -13,9 +13,17 @@ subdir('src/lib')
 # Declare a dependency so parent projects can do:                                                                         
 #   dependency('fparser', fallback: ['fparser', 'fparser_dep'])
 fparser_dep = declare_dependency(
-  link_with: fparser_lib,
-  include_directories: include_directories('src/lib')  # .mod
+  link_with: fparser_lib
 )  
+
+# Build pkgconfig file
+pkg = import('pkgconfig')
+pkg.generate(
+  name : 'fparser',
+  description : 'Fortran parser library',
+  version : meson.project_version(),
+  libraries : fparser_lib
+)
 
 # Export the dependency name to the parent project
 meson.override_dependency('fparser', fparser_dep)
