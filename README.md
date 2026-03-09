@@ -15,7 +15,8 @@ See commits history for detailed contribution.
 
 # FortranParser
 
-Fortran 2008 parser of mathematical expressions, based on Roland Schmehl [fparser](http://fparser.sourceforge.net)
+Fortran 2008 parser of mathematical expressions, based on Roland Schmehl
+[fparser](http://fparser.sourceforge.net)
 
 ## Table of contents
 
